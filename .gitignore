@@ -1,0 +1,12 @@
+results*
+doc*
+*egg-info*
+*__pycache__*
+data*
+*logs*
+*aux
+*bbl
+*blg
+*log
+paper/f4.png
+*synctex*
