@@ -1,10 +1,13 @@
-'''
-We look at the CKS (paper 7) isochrone ages.
+"""
+Contents:
 
-We also get the photometric rotation period measurements of CKS stars.
-... and then calculate gyrochronological ages from them (& B-V colors).
-(???)
-'''
+    get_M13_CKS_gyro
+    get_merged_M13_CKS
+
+    _get_McQuillan13_data
+    _get_cks_data
+    _apply_cks_VII_filters
+"""
 import matplotlib.pyplot as plt, pandas as pd, numpy as np
 import os
 
@@ -18,6 +21,48 @@ import astropy.units as u, astropy.constants as c
 from astropy.io.votable import parse
 
 from gilly.paths import DATADIR, RESULTSDIR
+
+def get_merged_M13_CKS():
+    """
+    Return a DataFrame containing the Fulton & Petigura (2018) CKS stellar and
+    planetary parameters, after the selection function has been applied. Merge
+    it against McQuillan+13 rotation periods.
+    """
+
+    df = _get_cks_data()
+    fp18_df = df[_apply_cks_VII_filters(df)]
+    m13_df = _get_McQuillan13_data()
+
+    fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
+    m13_df['KIC'] = m13_df['KIC'].astype(str)
+
+    mdf = fp18_df.merge(m13_df, how='inner', left_on='II_id_kic', right_on='KIC')
+
+    return mdf, fp18_df
+
+def get_M13_CKS_gyro():
+    """
+    Return a DataFrame containing the Fulton & Petigura (2018) CKS stellar and
+    planetary parameters, after the selection function has been applied. Merge
+    it against McQuillan+13 rotation periods. Then calculate the gyro ages
+    using the Mamajek & Hillenbrand (2008) relation.
+    """
+
+    df = _get_cks_data()
+    fp18_df = df[_apply_cks_VII_filters(df)]
+    m13_df = _get_McQuillan13_data()
+
+    fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
+    m13_df['KIC'] = m13_df['KIC'].astype(str)
+
+    mdf = fp18_df.merge(m13_df, how='inner', left_on='II_id_kic', right_on='KIC')
+
+    import IPython; IPython.embed()
+
+    assert 0
+
+    return mdf, fp18_df
+
 
 
 def _get_McQuillan13_data():
