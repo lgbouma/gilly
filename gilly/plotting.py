@@ -4,11 +4,65 @@ import matplotlib.pyplot as plt, pandas as pd, numpy as np, matplotlib as mpl
 from astropy import units as u, constants as c
 
 from gilly.helpers import (
-    get_merged_rot_CKS, get_merged_gyroage_CKS
+    get_merged_rot_CKS, get_merged_gyroage_CKS, _add_Christiansen12_CDPP
 )
-from gilly.paths import RESULTSDIR
+from gilly.paths import DATADIR, RESULTSDIR
 
 from aesthetic.plot import set_style, savefig
+from numpy import array as arr
+
+def plot_stsnr_vs_gyroage(Prot_source='M15', gyro_source='A19', cdpp_id='rms3'):
+    """
+    Prot_source: M13 or M15
+    gyro_source: MH08 or A19
+    cdpp_id: rms3, rms6, or rms12
+
+    Makes a Berger+2020 style single-transit SNR vs age plot.
+    The method is identical to Berger+2020. CDPP is taken from Christiansen
+    2012. Single-transit SNR is calculated by doing (Rp/R*)^2 * (1/CDPP). This
+    was cited as being from Petigura+2018. [.....]
+    """
+    mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
+                                 gyro_source=gyro_source)
+    mdf = _add_Christiansen12_CDPP(mdf)
+
+    Rp = 1*u.Rearth
+    Rstar = arr(mdf.VIIs_R)*u.Rsun
+    Rp_Rs = (Rp/Rstar).cgs.value
+    mdf['stsnr'] = (
+        Rp_Rs**2
+        *
+        (1/arr(1e-6*mdf[cdpp_id]))
+    )
+
+    scols = ['gyroage_yr', 'stsnr']
+    sdf = mdf[scols]
+
+    outdir = join(
+        RESULTSDIR, f'singletransitSNR_{Prot_source}rot_{gyro_source}age'
+    )
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    set_style()
+
+    f, ax = plt.subplots(figsize=(4,3))
+
+    ax.scatter(sdf.gyroage_yr, sdf.stsnr, s=2, c='k', zorder=3)
+
+    agelabel = (f'Gyro-Age [{Prot_source} '+'P$_\mathrm{rot}$ +'
+                +f'{gyro_source}; yr]')
+    ax.set_xlabel(agelabel, fontsize='small')
+
+    ax.set_ylabel(f'Single-transit SNR [C12 CDPP{cdpp_id.replace("rms","")}]',
+                  fontsize='small')
+
+    ax.set_xscale('log'); ax.set_yscale('log')
+
+    outpath = join(outdir,
+                   f'singletransitsnr_{cdpp_id}_rot{Prot_source}_gyro{gyro_source}.png')
+    savefig(f, outpath, writepdf=0)
+
+
 
 def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
     """

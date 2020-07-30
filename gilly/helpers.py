@@ -108,6 +108,25 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     return mdf
 
 
+def _add_Christiansen12_CDPP(mdf):
+
+    t = Table.read(
+        join(DATADIR, 'Christiansen_2012_Kepler_CDPP_table1.fits'), format='fits'
+    )
+    c_df = t.to_pandas()
+
+    # duplicates have different program IDs (PID), either "STKS" or "EX_STKS".
+    # not important! all stellar params are the same.
+    c_df = c_df.drop_duplicates(subset='KIC', keep='first')
+
+    outdf = mdf.merge(c_df, how='left', on='KIC')
+
+    assert len(outdf) == len(mdf)
+
+    return outdf
+
+
+
 
 def _get_McQuillan13_data():
 
