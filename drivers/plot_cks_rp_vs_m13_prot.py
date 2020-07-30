@@ -1,3 +1,0 @@
-from gilly.plotting import plot_cks_rp_vs_mcquillan_prot
-
-plot_cks_rp_vs_mcquillan_prot()

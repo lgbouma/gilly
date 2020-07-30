@@ -21,94 +21,106 @@ import astropy.units as u, astropy.constants as c
 from astropy.io.votable import parse
 
 from gilly.paths import DATADIR, RESULTSDIR
+from gilly.gyrochronology import MamajekHillenbrand08_gyro
+from cdips.utils.mamajek import get_interp_BmV_from_Teff
 
-def get_merged_M13_CKS():
+def get_merged_rot_CKS(Prot_source='M15'):
+
+    df = _get_cks_data()
+    fp18_df = df[_apply_cks_VII_filters(df)]
+    rot_df = (
+        _get_McQuillan13_data() if Prot_source == 'M13' else
+        _get_Mazeh15_data()
+    )
+
+    fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
+    rot_df['KIC'] = rot_df['KIC'].astype(str)
+
+    mdf = fp18_df.merge(rot_df, how='inner', left_on='II_id_kic', right_on='KIC')
+
+    return mdf, fp18_df
+
+
+def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     """
-    Return a DataFrame containing the Fulton & Petigura (2018) CKS stellar and
-    planetary parameters, after the selection function has been applied. Merge
-    it against McQuillan+13 rotation periods.
+    Same as get_merged_rot_CKS, but also calculate the gyro ages using the
+    Mamajek & Hillenbrand (2008) relation (or the Angus+19 one).
     """
 
     df = _get_cks_data()
     fp18_df = df[_apply_cks_VII_filters(df)]
-    m13_df = _get_McQuillan13_data()
+
+    if Prot_source == 'M13':
+        rot_df = _get_McQuillan13_data()
+    elif Prot_source == 'M15':
+        rot_df = _get_Mazeh15_data()
 
     fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
-    m13_df['KIC'] = m13_df['KIC'].astype(str)
+    rot_df['KIC'] = rot_df['KIC'].astype(str)
 
-    mdf = fp18_df.merge(m13_df, how='inner', left_on='II_id_kic', right_on='KIC')
+    mdf = fp18_df.merge(rot_df, how='inner', left_on='II_id_kic', right_on='KIC')
 
-    return mdf, fp18_df
+    if gyro_source == 'MH08':
+        BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
+        mdf['BmV'] = BmV
+        t_yr = MamajekHillenbrand08_gyro(arr(mdf.BmV), arr(mdf.Prot))
+        mdf['gyroage_yr'] = t_yr
 
-def get_M13_CKS_gyro():
-    """
-    Same as get_merged_M13_CKS, but then calculate the gyro ages using the
-    Mamajek & Hillenbrand (2008) relation.
+    elif gyro_source == 'A19':
+        raise NotImplementedError
 
-    This relation uses B-V instead of Teff.
-
-    Two possible approaches:
-
-        1. Interpolate Teff->B-V from the Mamajek & Pecaut table.
-
-        2. Query exoplanet archive... hope that KIC has B and V? Not viable.
-        Because nasa exoplanet archive KOI table has griz, JHKs, Kepler mags.
-        (Ugh. Maybe KOI IDs --> Gaia IDs --> TIC IDs --> any available TIC B &
-        V).
-
-    This implements #1.
-    """
-
-    df = _get_cks_data()
-    fp18_df = df[_apply_cks_VII_filters(df)]
-    m13_df = _get_McQuillan13_data()
-
-    fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
-    m13_df['KIC'] = m13_df['KIC'].astype(str)
-
-    mdf = fp18_df.merge(m13_df, how='inner', left_on='II_id_kic', right_on='KIC')
-
-    from cdips.utils.mamajek import get_interp_BmV_from_Teff
-    BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
-
-    mdf['BmV'] = BmV
-
-    #
-    # Mamajek & Hillenbrand 08 used
-    #
-    # Prot = a * [ (B-V)_0 - c ]^{b} * (t/Myr)^{n}
-    #
-    # and found some numbers. So
-    #
-    # (t/Myr) = [  (Prot/a) / [ (B-V)_0 - c ]^{b} ]^{1/n}
-    #
-
-    a = 0.407
-    a_err = 0.021
-    b = 0.325
-    b_err = 0.024
-    c = 0.495
-    c_err = 0.010
-    n = 0.566
-    n_err = 0.008
-
-    t_Myr = ( (mdf.Prot / a) / ( (mdf.BmV - c)**(b) ) )**(1/n)
-
-    t_yr = t_Myr * 1e6
-
-    mdf['gyroage_yr'] = t_yr
-
-    return mdf, fp18_df
+    return mdf
 
 
 
 def _get_McQuillan13_data():
 
-    vot = parse('../data/McQuillan_2013_ApJ_775L.vot')
+    vot = parse(join(DATADIR,'McQuillan_2013_ApJ_775L.vot'))
     m13 = vot.get_first_table()
     m13_df = m13.to_table().to_pandas()
 
     return m13_df
+
+
+
+def _get_Mazeh15_data():
+
+    hdul = fits.open(join(DATADIR,'Mazeh_2015_ApJ_801_3_table1.fits'))
+
+    t = Table(hdul[1].data)
+
+    m15_df = t.to_pandas()
+
+    # C: Centroid motion shows transit and rotational modulation on different
+    # stars 
+    # F: false positive (EB) identified in Mazeh+15
+    # R: 1 if rejected by visual exmaination stage
+    # M1: inconsistent periods across quarters
+    # M2: peaks not high enough depending on temperature and period
+    # 
+    # ignore:
+    # G: probable Giant flag, because the CKS Gaia parameters already select
+    # for this.
+    # T: Teff outside 3500-6500K, because the CKS Gaia parameters already select
+    # for this.
+    # 
+    # 
+
+    print(f'Mazeh15 starting with {len(m15_df)} KOIs')
+
+    sel = (
+        (~m15_df.C.astype(bool)) &
+        (~m15_df.F.astype(bool)) &
+        (~m15_df.R.astype(bool)) &
+        (~m15_df.M1.astype(bool)) &
+        (~m15_df.M2.astype(bool))
+    )
+
+    print(f'Mazeh15 with {len(m15_df[sel])} KOIs post-selection')
+
+    return m15_df[sel]
+
+
 
 
 def _get_cks_data():
