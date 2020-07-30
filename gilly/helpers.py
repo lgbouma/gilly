@@ -21,7 +21,7 @@ import astropy.units as u, astropy.constants as c
 from astropy.io.votable import parse
 
 from gilly.paths import DATADIR, RESULTSDIR
-from gilly.gyrochronology import MamajekHillenbrand08_gyro
+from gilly.gyrochronology import MamajekHillenbrand08_gyro, Angus19_gyro
 from cdips.utils.mamajek import get_interp_BmV_from_Teff
 
 def get_merged_rot_CKS(Prot_source='M15'):
@@ -48,15 +48,62 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     """
 
     mdf, _ = get_merged_rot_CKS(Prot_source=Prot_source)
+    Prot = arr(mdf.Prot)
 
     if gyro_source == 'MH08':
         BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
         mdf['BmV'] = BmV
-        t_yr = MamajekHillenbrand08_gyro(arr(mdf.BmV), arr(mdf.Prot))
+        t_yr = MamajekHillenbrand08_gyro(arr(mdf.BmV), Prot)
         mdf['gyroage_yr'] = t_yr
 
     elif gyro_source == 'A19':
-        raise NotImplementedError
+
+        gaiasupppath = join(
+            DATADIR, f'prot{Prot_source}_gyro{gyro_source}_Gaiasupp.csv'
+        )
+        if not os.path.exists(gaiasupppath):
+            # merge the CKS + rotation KOIs against Gaia. Use Megan Bedell's
+            # https://gaia-kepler.fun/ 1 arcsecond crossmatch.
+            t = Table.read(
+                join(DATADIR, 'kepler_dr2_1arcsec.fits'), format='fits'
+            )
+            g_df = t.to_pandas()
+
+            g_df['KIC'] = g_df.kepid.astype(str)
+
+            selcols = ['KIC', 'source_id', 'astrometric_excess_noise',
+                       'phot_g_mean_mag', 'phot_bp_mean_mag',
+                       'phot_rp_mean_mag']
+
+            g_df = g_df[selcols]
+
+            mdf.KIC = mdf.KIC.astype(str)
+
+            # NOTE: Bedell's crossmatch was KIC against Gaia DR2. So, some KIC
+            # entries have multiple source_ids. (i.e., chance alignments or
+            # binaries within 1 arcsec). Usually the bright star dominates --
+            # take that one.
+            g_df = g_df.sort_values(by=['KIC','phot_g_mean_mag'])
+            g_df = g_df.drop_duplicates(subset='KIC', keep='first')
+
+            mdf_gaiasupp = pd.merge(mdf, g_df, on='KIC', how='left')
+            print(gaiasupppath)
+            print(f'Pre merge: {len(mdf)}')
+            print(f'Gaia supp: {len(mdf_gaiasupp)}')
+
+            mdf_gaiasupp.to_csv(gaiasupppath, index=False)
+
+        if Prot_source == 'M13' or Prot_source == 'M15':
+            N_missed = 0
+
+        mdf = pd.read_csv(gaiasupppath)
+        print(42*'-'+f'\nWRN! Missed {N_missed} sources during Gaia merge\n'+42*'-')
+
+        BpmRp = arr(mdf.phot_bp_mean_mag) - arr(mdf.phot_rp_mean_mag)
+        mdf['BpmRp'] = BpmRp
+
+        t_yr = Angus19_gyro(BpmRp, Prot)
+        mdf['gyroage_yr'] = t_yr
 
     return mdf
 

@@ -1,3 +1,5 @@
+import numpy as np
+
 def MamajekHillenbrand08_gyro(BmV, Prot):
     """
     Mamajek & Hillenbrand 08 used
@@ -41,8 +43,10 @@ def Angus19_gyro(BpmRp, Prot):
 
     log10_period = np.log10(Prot)
 
-    log10_age_yrs = age_model(log10_period, BpmRp)
+    log10_age_yrs = []
+    for p, _bpmrp in zip(log10_period, BpmRp):
+        log10_age_yrs.append(age_model(p, _bpmrp))
 
-    t_yr = 10**log10_age_yrs
+    t_yr = 10**np.array(log10_age_yrs)
 
     return t_yr
