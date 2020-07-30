@@ -11,16 +11,181 @@ from gilly.paths import DATADIR, RESULTSDIR
 from aesthetic.plot import set_style, savefig
 from numpy import array as arr
 
+def plot_cdf_rp_agecut_KS_test(agecut=1e9, Prot_source='M15',
+                               gyro_source='A19'):
+    """
+    Prot_source (str): M13 or M15
+    gyro_source (str): MH08 or A19
+    agecut (float): Age cut in years
+
+    Plot CDF, do KS test, calculate p-values.
+    """
+
+    mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
+                                 gyro_source=gyro_source)
+
+    odf = mdf[(mdf.gyroage_yr > agecut) & (mdf.VIIp_Rp < 6)] # old
+    ydf = mdf[(mdf.gyroage_yr <= agecut) & (mdf.VIIp_Rp < 6)] # young
+    N_o = len(odf)
+    N_y = len(ydf)
+
+    #
+    # make the plot!
+    #
+    outdir = join(
+        RESULTSDIR, f'cdf_rp_agecut_KS_test'
+    )
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    set_style()
+
+    f, ax = plt.subplots(figsize=(4,3))
+
+    bins = np.linspace(mdf.VIIp_Rp.min(), mdf.VIIp_Rp.max(), 1000)
+
+    cnt, bin_edges = np.histogram(arr(odf.VIIp_Rp), bins=bins, normed=True)
+    cdf = np.cumsum(cnt)
+    ax.plot(bin_edges[:-1], cdf/cdf[-1],
+            label=f'Age > {agecut/1e9:.1f} Gyr ({N_o})')
+
+    cnt, bin_edges = np.histogram(arr(ydf.VIIp_Rp), bins=bins, normed=True)
+    cdf = np.cumsum(cnt)
+    ax.plot(bin_edges[:-1], cdf/cdf[-1],
+            label=f'Age < {agecut/1e9:.1f} Gyr ({N_y})')
+
+    ax.set_xscale('log')
+
+    from scipy.stats import ks_2samp
+    D, p_value = ks_2samp(arr(odf.VIIp_Rp), arr(ydf.VIIp_Rp))
+
+    txt = f'D={D:.2e}, p={p_value:.2e}'
+
+    ax.text(0.05, 0.95, txt,
+            transform=ax.transAxes, ha='left', va='top',
+            fontsize='small')
+
+    ax.legend(fontsize='small', loc='lower right')
+
+    ax.set_xlabel('CKS-VII R$_\mathrm{p}$ [R$_\oplus$]')
+
+    outpath = join(
+        outdir,
+        f'cdf_Rp_KS_cut{agecut/1e9:.1f}_prot{Prot_source}_gyro{gyro_source}.png'
+    )
+    savefig(f, outpath, writepdf=0)
+
+
+
+
+def plot_hist_rp_agecut(agecut=1e9, Prot_source='M15', gyro_source='A19'):
+    """
+    Prot_source (str): M13 or M15
+    gyro_source (str): MH08 or A19
+    agecut (float): Age cut in years
+
+    Plot histogram. $$$?
+    """
+
+    mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
+                                 gyro_source=gyro_source)
+
+    odf = mdf[(mdf.gyroage_yr > agecut) & (mdf.VIIp_Rp < 6)] # old
+    ydf = mdf[(mdf.gyroage_yr <= agecut) & (mdf.VIIp_Rp < 6)] # young
+    N_o = len(odf)
+    N_y = len(ydf)
+
+    # Following Fulton et al 2017, we define a “super-Earth” as a
+    # planet with a radius of 1–1.75 Re, and a “sub-Neptune” as
+    # having a radius of 1.75–4.0 Re.
+
+    # old: number of superNeptunes /  number of super Earths
+    o_NsN = len(odf[(odf.VIIp_Rp > 1.75) & (odf.VIIp_Rp <= 4.00)])
+    o_NsE = len(odf[(odf.VIIp_Rp > 1.00) & (odf.VIIp_Rp <= 1.75)])
+    unc_o_NsN = np.sqrt(len(odf[(odf.VIIp_Rp > 1.75) & (odf.VIIp_Rp <= 4.00)]))
+    unc_o_NsE = np.sqrt(len(odf[(odf.VIIp_Rp > 1.00) & (odf.VIIp_Rp <= 1.75)]))
+
+    o_NsN_div_NsE = o_NsN / o_NsE
+    unc_o_div = o_NsN_div_NsE * np.sqrt( (unc_o_NsN/o_NsN)**2 + (unc_o_NsE/o_NsE)**2 )
+
+    # ditto for young
+    y_NsN = len(ydf[(ydf.VIIp_Rp > 1.75) & (ydf.VIIp_Rp <= 4.00)])
+    y_NsE = len(ydf[(ydf.VIIp_Rp > 1.00) & (ydf.VIIp_Rp <= 1.75)])
+    unc_y_NsN = np.sqrt(len(ydf[(ydf.VIIp_Rp > 1.75) & (ydf.VIIp_Rp <= 4.00)]))
+    unc_y_NsE = np.sqrt(len(ydf[(ydf.VIIp_Rp > 1.00) & (ydf.VIIp_Rp <= 1.75)]))
+
+    y_NsN_div_NsE = y_NsN / y_NsE
+    unc_y_div = y_NsN_div_NsE * np.sqrt( (unc_y_NsN/y_NsN)**2 + (unc_y_NsE/y_NsE)**2 )
+
+    txt = (
+        'N$_{\mathrm{subNeptune}}$/N$_{\mathrm{superEarth}}$:'
+        +
+        f'\nOld: {o_NsN_div_NsE:.2f} $\pm$ {unc_o_div:.2f}'
+        +
+        f'\nYoung: {y_NsN_div_NsE:.2f} $\pm$ {unc_y_div:.2f}'
+    )
+
+    #
+    # make the plot!
+    #
+    outdir = join(
+        RESULTSDIR, f'hist_rp_agecut'
+    )
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    set_style()
+
+    f, ax = plt.subplots(figsize=(4,3))
+
+    bins = np.arange(0, 6.25, 0.25)
+
+    ax.hist(odf.VIIp_Rp, bins=bins, cumulative=False, fill=False, density=False,
+            weights=np.ones(N_o)/N_o,
+            histtype='step', label=f'Age > {agecut/1e9:.1f} Gyr ({N_o})')
+
+    ax.hist(ydf.VIIp_Rp, bins=bins, cumulative=False, fill=False, density=False,
+            weights=np.ones(N_y)/N_y,
+            histtype='step', label=f'Age < {agecut/1e9:.1f} Gyr ({N_y})')
+
+    ymin, ymax = ax.get_ylim()
+    ax.vlines(
+        1.74, ymin, ymax, colors='darkgray', alpha=1,
+        linestyles='--', zorder=-2, linewidths=0.5
+    )
+    ax.set_ylim((ymin, ymax))
+
+    # Create new legend handles but use the colors from the existing ones
+    from matplotlib.lines import Line2D
+    handles, labels = ax.get_legend_handles_labels()
+    new_handles = [Line2D([], [], c=h.get_edgecolor()) for h in handles]
+
+    ax.legend(handles=new_handles, labels=labels, fontsize='small')
+
+    ax.text(0.95, 0.50, txt,
+            transform=ax.transAxes, ha='right', va='center',
+            fontsize='small')
+
+    ax.set_ylabel('Fraction per bin')
+    ax.set_xlabel('CKS-VII R$_\mathrm{p}$ [R$_\oplus$]')
+
+    outpath = join(
+        outdir,
+        f'hist_Rp_cut{agecut/1e9:.1f}_prot{Prot_source}_gyro{gyro_source}.png'
+    )
+    savefig(f, outpath, writepdf=0)
+
+
+
+
 def plot_stsnr_vs_gyroage(Prot_source='M15', gyro_source='A19', cdpp_id='rms3'):
     """
     Prot_source: M13 or M15
     gyro_source: MH08 or A19
     cdpp_id: rms3, rms6, or rms12
 
-    Makes a Berger+2020 style single-transit SNR vs age plot.
-    The method is identical to Berger+2020. CDPP is taken from Christiansen
-    2012. Single-transit SNR is calculated by doing (Rp/R*)^2 * (1/CDPP). This
-    was cited as being from Petigura+2018. [.....]
+    Makes a Berger+2020 style single-transit SNR vs age plot.  The method is
+    identical to Berger+2020. CDPP is taken from Christiansen 2012.
+    Single-transit SNR is calculated by doing (Rp/R*)^2 * (1/CDPP). This was
+    cited as being from Petigura+2018. [.....]
     """
     mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
                                  gyro_source=gyro_source)
@@ -68,6 +233,9 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
     """
     Prot_source: M13 or M15
     gyro_source: MH08 or A19
+
+    Make scatter plots of {plantet radius, orbital period} against
+    gyrochronology ages in a few different projections.
     """
     mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
                                  gyro_source=gyro_source)
@@ -131,6 +299,9 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
 def plot_cks_rp_vs_prot(Prot_source='M15'):
     """
     Prot_source: M13 or M15
+
+    Make scatter plots of {plantet radius, orbital period} against
+    rotation periods in a few different projections.
     """
 
     mdf, fp18_df = get_merged_rot_CKS(Prot_source=Prot_source)
