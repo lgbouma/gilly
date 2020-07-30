@@ -42,10 +42,21 @@ def get_merged_M13_CKS():
 
 def get_M13_CKS_gyro():
     """
-    Return a DataFrame containing the Fulton & Petigura (2018) CKS stellar and
-    planetary parameters, after the selection function has been applied. Merge
-    it against McQuillan+13 rotation periods. Then calculate the gyro ages
-    using the Mamajek & Hillenbrand (2008) relation.
+    Same as get_merged_M13_CKS, but then calculate the gyro ages using the
+    Mamajek & Hillenbrand (2008) relation.
+
+    This relation uses B-V instead of Teff.
+
+    Two possible approaches:
+
+        1. Interpolate Teff->B-V from the Mamajek & Pecaut table.
+
+        2. Query exoplanet archive... hope that KIC has B and V? Not viable.
+        Because nasa exoplanet archive KOI table has griz, JHKs, Kepler mags.
+        (Ugh. Maybe KOI IDs --> Gaia IDs --> TIC IDs --> any available TIC B &
+        V).
+
+    This implements #1.
     """
 
     df = _get_cks_data()
@@ -57,9 +68,35 @@ def get_M13_CKS_gyro():
 
     mdf = fp18_df.merge(m13_df, how='inner', left_on='II_id_kic', right_on='KIC')
 
-    import IPython; IPython.embed()
+    from cdips.utils.mamajek import get_interp_BmV_from_Teff
+    BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
 
-    assert 0
+    mdf['BmV'] = BmV
+
+    #
+    # Mamajek & Hillenbrand 08 used
+    #
+    # Prot = a * [ (B-V)_0 - c ]^{b} * (t/Myr)^{n}
+    #
+    # and found some numbers. So
+    #
+    # (t/Myr) = [  (Prot/a) / [ (B-V)_0 - c ]^{b} ]^{1/n}
+    #
+
+    a = 0.407
+    a_err = 0.021
+    b = 0.325
+    b_err = 0.024
+    c = 0.495
+    c_err = 0.010
+    n = 0.566
+    n_err = 0.008
+
+    t_Myr = ( (mdf.Prot / a) / ( (mdf.BmV - c)**(b) ) )**(1/n)
+
+    t_yr = t_Myr * 1e6
+
+    mdf['gyroage_yr'] = t_yr
 
     return mdf, fp18_df
 
