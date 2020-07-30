@@ -28,10 +28,10 @@ def get_merged_rot_CKS(Prot_source='M15'):
 
     df = _get_cks_data()
     fp18_df = df[_apply_cks_VII_filters(df)]
-    rot_df = (
-        _get_McQuillan13_data() if Prot_source == 'M13' else
-        _get_Mazeh15_data()
-    )
+    if Prot_source == 'M13':
+        rot_df = _get_McQuillan13_data()
+    elif Prot_source == 'M15':
+        rot_df = _get_Mazeh15_data()
 
     fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
     rot_df['KIC'] = rot_df['KIC'].astype(str)
@@ -47,18 +47,7 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     Mamajek & Hillenbrand (2008) relation (or the Angus+19 one).
     """
 
-    df = _get_cks_data()
-    fp18_df = df[_apply_cks_VII_filters(df)]
-
-    if Prot_source == 'M13':
-        rot_df = _get_McQuillan13_data()
-    elif Prot_source == 'M15':
-        rot_df = _get_Mazeh15_data()
-
-    fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
-    rot_df['KIC'] = rot_df['KIC'].astype(str)
-
-    mdf = fp18_df.merge(rot_df, how='inner', left_on='II_id_kic', right_on='KIC')
+    mdf, _ = get_merged_rot_CKS(Prot_source=Prot_source)
 
     if gyro_source == 'MH08':
         BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))

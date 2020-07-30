@@ -15,7 +15,6 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
     Prot_source: M13 or M15
     gyro_source: MH08 or A19
     """
-
     mdf = get_merged_gyroage_CKS(Prot_source=Prot_source,
                                  gyro_source=gyro_source)
 
