@@ -1,10 +1,12 @@
 """
 Contents:
 
-    get_M13_CKS_gyro
-    get_merged_M13_CKS
+    get_merged_rot_CKS
+    get_merged_gyroage_CKS
 
+    _add_Christiansen12_CDPP
     _get_McQuillan13_data
+    _get_Mazeh15_data
     _get_cks_data
     _apply_cks_VII_filters
 """
@@ -23,6 +25,30 @@ from astropy.io.votable import parse
 from gilly.paths import DATADIR, RESULTSDIR
 from gilly.gyrochronology import MamajekHillenbrand08_gyro, Angus19_gyro
 from cdips.utils.mamajek import get_interp_BmV_from_Teff
+
+def _get_spec_vsini_phot_Prot_overlap(Prot_source='M15'):
+
+    rdf, fp18_df = get_merged_rot_CKS(Prot_source=Prot_source)
+
+    cdf = pd.read_csv(join(DATADIR, '20200806_cksgaia-planets-filtered.csv'))
+
+    cdf.id_kic = cdf.id_kic.astype(np.int64)
+    rdf.II_id_kic = rdf.II_id_kic.astype(np.int64)
+
+    mdf = rdf.merge(cdf, how='left', left_on='II_id_kic', right_on='id_kic')
+    assert len(mdf) == len(rdf)
+
+    vsini = arr(mdf.cks_svsini)*u.km/u.s
+
+    rstar = arr(mdf.VIIs_R)*u.Rsun
+
+    # vsini ~= 2πR*/Prot (when sini=1)
+    spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
+
+    mdf['spec_Prot'] = spec_Prot
+
+    return mdf
+
 
 def get_merged_rot_CKS(Prot_source='M15'):
 

@@ -1,15 +1,69 @@
+"""
+contents:
+
+    plot_spec_vs_phot_Prot
+
+    plot_cdf_rp_agecut_KS_test
+    plot_hist_rp_agecut
+    plot_stsnr_vs_gyroage
+    plot_cks_rp_vs_gyroage
+    plot_cks_rp_vs_prot
+    plot_spec_vs_phot_Prot
+"""
 import os
 from os.path import join
 import matplotlib.pyplot as plt, pandas as pd, numpy as np, matplotlib as mpl
 from astropy import units as u, constants as c
 
 from gilly.helpers import (
-    get_merged_rot_CKS, get_merged_gyroage_CKS, _add_Christiansen12_CDPP
+    get_merged_rot_CKS, get_merged_gyroage_CKS, _add_Christiansen12_CDPP,
+    _get_spec_vsini_phot_Prot_overlap
 )
 from gilly.paths import DATADIR, RESULTSDIR
 
 from aesthetic.plot import set_style, savefig
 from numpy import array as arr
+
+def plot_spec_vs_phot_Prot(Prot_source='M15', spec_source='cks'):
+    """
+    Prot_source (str): M13 or M15
+    spec_source (str): always 'cks', because that's the only vsini source.
+        [nb. this is the vsini dataset from J. Winn, received 2 Aug 2020]
+    """
+
+    if spec_source != 'cks':
+        raise NotImplementedError
+
+    mdf = _get_spec_vsini_phot_Prot_overlap(Prot_source=Prot_source)
+
+    outdir = join(RESULTSDIR, 'spec_rot')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    set_style()
+
+    f, ax = plt.subplots(figsize=(4,3))
+    ax.scatter(mdf.Prot, mdf.spec_Prot, s=2, c='k', zorder=3)
+    _, xmax = ax.get_xlim()
+    span = np.linspace(2, xmax, 100)
+    ax.plot(span, span, zorder=-1, lw=1, ls='--', c='lightgray',
+            label='$i=90^\circ$')
+    ax.plot(span, span/np.sin(np.deg2rad(45)), zorder=-1, lw=1, ls=':', c='lightgray',
+            label='$i=45^\circ$')
+    ax.legend(fontsize='small')
+    ax.set_xscale('log'); ax.set_yscale('log')
+    ax.set_xlabel(f'{Prot_source} phot '+'P$_\mathrm{rot}$ [day]')
+    ax.set_ylabel(f'CKS-VII spec '+'P$_\mathrm{rot}$ [day]')
+    outpath = join(outdir, f'cks-VII_specrot_vs_{Prot_source}_prot.png')
+    savefig(f, outpath, writepdf=0)
+
+    sel = (mdf.Prot < 10)
+    sdf = mdf[sel]
+    sdf['specProt/photProt'] = sdf.spec_Prot/sdf.Prot
+    sdf = sdf.sort_values(by='specProt/photProt', ascending=False)
+    selcols = ['VIIp_KOI', 'Prot', 'spec_Prot']
+    print(sdf[selcols][:20].to_string(index=False))
+
 
 def plot_cdf_rp_agecut_KS_test(agecut=1e9, Prot_source='M15',
                                gyro_source='A19'):
