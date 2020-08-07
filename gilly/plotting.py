@@ -2,6 +2,7 @@
 contents:
 
     plot_spec_vs_phot_Prot
+    plot_spec_Prot_hist
 
     plot_cdf_rp_agecut_KS_test
     plot_hist_rp_agecut
@@ -23,6 +24,68 @@ from gilly.paths import DATADIR, RESULTSDIR
 
 from aesthetic.plot import set_style, savefig
 from numpy import array as arr
+from matplotlib.lines import Line2D
+
+def plot_spec_Prot_hist(Prot_source='M15', spec_source='cks'):
+    """
+    Prot_source (str): M13 or M15
+    spec_source (str): always 'cks', because that's the only vsini source.
+        [nb. this is the vsini dataset from J. Winn, received 2 Aug 2020]
+    """
+
+    if spec_source != 'cks':
+        raise NotImplementedError
+
+    mdf, cdf = _get_spec_vsini_phot_Prot_overlap(Prot_source=Prot_source)
+    sel = cdf['id_kic'].isin(arr(mdf['id_kic']))
+    scdf = cdf[~sel]
+
+    print(f'{len(cdf)} with vsini')
+    print(f'{len(mdf[(~pd.isnull(mdf.spec_Prot)) & (~pd.isnull(mdf.Prot))])} with vsini & M15 prot')
+    print(f'{len(scdf)} with vsini & and no M15 prot')
+
+    outdir = join(RESULTSDIR, 'spec_rot')
+
+    set_style()
+
+    f, ax = plt.subplots(figsize=(4,3))
+
+    bins = np.arange(0, 52.5, 2.5)
+
+    N_m = len(mdf)
+    N_n = len(scdf)
+
+    ax.hist(scdf.spec_Prot, bins=bins, cumulative=False, fill=False, density=False,
+            weights=np.ones(N_n)/N_n,
+            histtype='step', label=f'No M15 match ({len(scdf)})')
+
+    ax.hist(mdf.spec_Prot, bins=bins, cumulative=False, fill=False, density=False,
+            weights=np.ones(N_m)/N_m,
+            histtype='step', label=f'Has M15 match ({len(mdf)})')
+
+    # Create new legend handles but use the colors from the existing ones
+    handles, labels = ax.get_legend_handles_labels()
+    new_handles = [Line2D([], [], c=h.get_edgecolor()) for h in handles]
+    ax.legend(handles=new_handles, labels=labels, fontsize='small')
+
+    txt = (
+        r'$\mu_{T_{\mathrm{eff}}} \pm \sigma_{T_{\mathrm{eff}}}$ '+' for P$_{\mathrm{rot}}^{\mathrm{spec}} < 25$ d:\n'
+        'No M15: '+f'{int(scdf[scdf.spec_Prot<25].cks_steff.mean())} $\pm$ {int(scdf[scdf.spec_Prot<25].cks_steff.std())}\n'
+        'Has M15: '+f'{int(mdf[mdf.spec_Prot<25].VIIs_Teff.mean())} $\pm$ {int(mdf[mdf.spec_Prot<25].VIIs_Teff.std())}\n'
+    )
+    ax.text(0.95, 0.50, txt,
+            transform=ax.transAxes, ha='right', va='center',
+            fontsize='small')
+
+    ax.set_ylabel('Fraction per bin')
+    ax.set_xlabel('CKS-VII P$_{\mathrm{rot}}^{\mathrm{spec}}$ [day]')
+
+    outpath = join(
+        outdir,
+        f'spec_Prot_hist_prot{Prot_source}.png'
+    )
+    savefig(f, outpath, writepdf=0)
+
 
 def plot_spec_vs_phot_Prot(Prot_source='M15', spec_source='cks'):
     """
@@ -34,7 +97,7 @@ def plot_spec_vs_phot_Prot(Prot_source='M15', spec_source='cks'):
     if spec_source != 'cks':
         raise NotImplementedError
 
-    mdf = _get_spec_vsini_phot_Prot_overlap(Prot_source=Prot_source)
+    mdf, _  = _get_spec_vsini_phot_Prot_overlap(Prot_source=Prot_source)
 
     outdir = join(RESULTSDIR, 'spec_rot')
     if not os.path.exists(outdir):
@@ -208,7 +271,6 @@ def plot_hist_rp_agecut(agecut=1e9, Prot_source='M15', gyro_source='A19'):
     ax.set_ylim((ymin, ymax))
 
     # Create new legend handles but use the colors from the existing ones
-    from matplotlib.lines import Line2D
     handles, labels = ax.get_legend_handles_labels()
     new_handles = [Line2D([], [], c=h.get_edgecolor()) for h in handles]
 

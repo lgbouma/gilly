@@ -4,6 +4,8 @@ Contents:
     get_merged_rot_CKS
     get_merged_gyroage_CKS
 
+    _get_spec_vsini_phot_Prot_overlap
+
     _add_Christiansen12_CDPP
     _get_McQuillan13_data
     _get_Mazeh15_data
@@ -38,16 +40,19 @@ def _get_spec_vsini_phot_Prot_overlap(Prot_source='M15'):
     mdf = rdf.merge(cdf, how='left', left_on='II_id_kic', right_on='id_kic')
     assert len(mdf) == len(rdf)
 
-    vsini = arr(mdf.cks_svsini)*u.km/u.s
-
-    rstar = arr(mdf.VIIs_R)*u.Rsun
-
     # vsini ~= 2πR*/Prot (when sini=1)
+    vsini = arr(mdf.cks_svsini)*u.km/u.s
+    rstar = arr(mdf.VIIs_R)*u.Rsun
     spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
-
     mdf['spec_Prot'] = spec_Prot
 
-    return mdf
+    # get spec_Prot for the full CKS table too
+    vsini = arr(cdf.cks_svsini)*u.km/u.s
+    rstar = arr(cdf.giso_srad)*u.Rsun
+    spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
+    cdf['spec_Prot'] = spec_Prot
+
+    return mdf, cdf
 
 
 def get_merged_rot_CKS(Prot_source='M15'):
