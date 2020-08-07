@@ -32,7 +32,7 @@ def _get_spec_vsini_phot_Prot_overlap(Prot_source='M15'):
 
     rdf, fp18_df = get_merged_rot_CKS(Prot_source=Prot_source)
 
-    cdf = pd.read_csv(join(DATADIR, '20200806_cksgaia-planets-filtered.csv'))
+    cdf = _get_CKS_vsini_data()
 
     cdf.id_kic = cdf.id_kic.astype(np.int64)
     rdf.II_id_kic = rdf.II_id_kic.astype(np.int64)
@@ -46,12 +46,6 @@ def _get_spec_vsini_phot_Prot_overlap(Prot_source='M15'):
     spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
     mdf['spec_Prot'] = spec_Prot
 
-    # get spec_Prot for the full CKS table too
-    vsini = arr(cdf.cks_svsini)*u.km/u.s
-    rstar = arr(cdf.giso_srad)*u.Rsun
-    spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
-    cdf['spec_Prot'] = spec_Prot
-
     return mdf, cdf
 
 
@@ -61,13 +55,21 @@ def get_merged_rot_CKS(Prot_source='M15'):
     fp18_df = df[_apply_cks_VII_filters(df)]
     if Prot_source == 'M13':
         rot_df = _get_McQuillan13_data()
+        kic_key = 'KIC'
     elif Prot_source == 'M15':
         rot_df = _get_Mazeh15_data()
+        kic_key = 'KIC'
+    elif Prot_source == 'VSINI':
+        rot_df = _get_CKS_vsini_data(snrcut=True)
+        kic_key = 'id_kic'
+    else:
+        raise NotImplementedError
 
     fp18_df['II_id_kic'] = fp18_df['II_id_kic'].astype(str)
-    rot_df['KIC'] = rot_df['KIC'].astype(str)
+    rot_df[kic_key] = rot_df[kic_key].astype(str)
 
-    mdf = fp18_df.merge(rot_df, how='inner', left_on='II_id_kic', right_on='KIC')
+    mdf = fp18_df.merge(rot_df, how='inner', left_on='II_id_kic',
+                        right_on=kic_key)
 
     return mdf, fp18_df
 
@@ -79,7 +81,8 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     """
 
     mdf, _ = get_merged_rot_CKS(Prot_source=Prot_source)
-    Prot = arr(mdf.Prot)
+    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
+    Prot = arr(mdf[Prot_key])
 
     if gyro_source == 'MH08':
         BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
@@ -108,7 +111,8 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
 
             g_df = g_df[selcols]
 
-            mdf.KIC = mdf.KIC.astype(str)
+            kic_key = 'KIC' if Prot_source in ['M13','M15'] else 'id_kic'
+            mdf[kic_key] = mdf[kic_key].astype(str)
 
             # NOTE: Bedell's crossmatch was KIC against Gaia DR2. So, some KIC
             # entries have multiple source_ids. (i.e., chance alignments or
@@ -117,15 +121,17 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
             g_df = g_df.sort_values(by=['KIC','phot_g_mean_mag'])
             g_df = g_df.drop_duplicates(subset='KIC', keep='first')
 
-            mdf_gaiasupp = pd.merge(mdf, g_df, on='KIC', how='left')
+            mdf_gaiasupp = pd.merge(mdf, g_df, left_on=kic_key, right_on='KIC', how='left')
             print(gaiasupppath)
             print(f'Pre merge: {len(mdf)}')
             print(f'Gaia supp: {len(mdf_gaiasupp)}')
 
             mdf_gaiasupp.to_csv(gaiasupppath, index=False)
 
-        if Prot_source == 'M13' or Prot_source == 'M15':
+        if Prot_source in ['M13', 'M15', 'VSINI']:
             N_missed = 0
+        else:
+            raise NotImplementedError
 
         mdf = pd.read_csv(gaiasupppath)
         print(42*'-'+f'\nWRN! Missed {N_missed} sources during Gaia merge\n'+42*'-')
@@ -156,6 +162,24 @@ def _add_Christiansen12_CDPP(mdf):
 
     return outdf
 
+
+
+def _get_CKS_vsini_data(snrcut=False):
+    """
+    if snrcut: require vsini > 3 km/s
+    """
+
+    cdf = pd.read_csv(join(DATADIR, '20200806_cksgaia-planets-filtered.csv'))
+
+    if snrcut:
+        cdf = cdf[cdf.cks_svsini > 3]
+
+    vsini = arr(cdf.cks_svsini)*u.km/u.s
+    rstar = arr(cdf.giso_srad)*u.Rsun
+    spec_Prot = (2*np.pi*rstar / vsini).to(u.day).value
+    cdf['spec_Prot'] = spec_Prot
+
+    return cdf
 
 
 

@@ -194,7 +194,8 @@ def plot_cdf_rp_agecut_KS_test(agecut=1e9, Prot_source='M15',
 
 
 
-def plot_hist_rp_agecut(agecut=1e9, Prot_source='M15', gyro_source='A19'):
+def plot_hist_rp_agecut(agecut=1e9, Prot_source='M15', gyro_source='A19',
+                        fix_ylim=None):
     """
     Prot_source (str): M13 or M15
     gyro_source (str): MH08 or A19
@@ -262,6 +263,9 @@ def plot_hist_rp_agecut(agecut=1e9, Prot_source='M15', gyro_source='A19'):
     ax.hist(ydf.VIIp_Rp, bins=bins, cumulative=False, fill=False, density=False,
             weights=np.ones(N_y)/N_y,
             histtype='step', label=f'Age < {agecut/1e9:.1f} Gyr ({N_y})')
+
+    if fix_ylim:
+        ax.set_ylim([0,0.28])
 
     ymin, ymax = ax.get_ylim()
     ax.vlines(
@@ -392,7 +396,8 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
 
     plt.close('all')
     f, ax = plt.subplots(figsize=(4.3,3))
-    sel = ~pd.isnull(mdf.Prot)
+    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
+    sel = ~pd.isnull(mdf[Prot_key])
 
     norm = mpl.colors.Normalize(vmin=8.5, vmax=10)
     cax = ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=7,
@@ -421,6 +426,7 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
     """
 
     mdf, fp18_df = get_merged_rot_CKS(Prot_source=Prot_source)
+    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
 
     set_style()
 
@@ -430,7 +436,7 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
 
     for scale in ['linear','log']:
         f, ax = plt.subplots(figsize=(4,3))
-        ax.scatter(mdf.VIIp_Rp, mdf.Prot, s=2, c='k', zorder=3)
+        ax.scatter(mdf.VIIp_Rp, mdf[Prot_key], s=2, c='k', zorder=3)
         ax.set_xlabel('CKS-VII R$_\mathrm{p}$ [R$_\oplus$]')
         ax.set_ylabel(f'{Prot_source} '+'P$_\mathrm{rot}$ [day]')
         ax.set_xscale(scale); ax.set_yscale(scale)
@@ -439,7 +445,7 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
 
     plt.close('all')
     f, ax = plt.subplots(figsize=(4,3))
-    ax.scatter(mdf.VIIp_Per, mdf.Prot, s=2, c='k')
+    ax.scatter(mdf.VIIp_Per, mdf[Prot_key], s=2, c='k')
     ax.set_xlabel('CKS-VII P$_\mathrm{orb}$ [day]')
     ax.set_ylabel(f'{Prot_source} '+'P$_\mathrm{rot}$ [day]')
     ax.set_xscale('log'); ax.set_yscale('log')
@@ -448,7 +454,7 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
 
     plt.close('all')
     f, ax = plt.subplots(figsize=(4,3))
-    sel = ~pd.isnull(mdf.Prot)
+    sel = ~pd.isnull(mdf[Prot_key])
     N_withProt = len(mdf[sel])
     N_noProt = len(fp18_df) - N_withProt
     ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=2, c='k', zorder=3,
@@ -464,13 +470,14 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
 
     plt.close('all')
     f, ax = plt.subplots(figsize=(4.3,3))
-    sel = ~pd.isnull(mdf.Prot)
+    sel = ~pd.isnull(mdf[Prot_key])
     N_withProt = len(mdf[sel])
     N_noProt = len(fp18_df) - N_withProt
 
     l = f'Yes {Prot_source}'+' P$_\mathrm{rot}$ '+f'({N_withProt})'
     norm = mpl.colors.Normalize(vmin=5, vmax=25)
-    cax = ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=7, c=mdf[sel].Prot,
+    cax = ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=7,
+                     c=mdf[sel][Prot_key],
                      cmap='plasma_r', zorder=3, label=l, norm=norm,
                      edgecolors='k', linewidths=0.2)
 
