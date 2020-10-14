@@ -352,7 +352,7 @@ def plot_stsnr_vs_gyroage(Prot_source='M15', gyro_source='A19', cdpp_id='rms3'):
 def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
     """
     Prot_source: M13 or M15
-    gyro_source: MH08 or A19
+    gyro_source: MH08 or A19 or SL20
 
     Make scatter plots of {plantet radius, orbital period} against
     gyrochronology ages in a few different projections.
@@ -376,7 +376,7 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
         ax.set_xscale(scale); ax.set_yscale('log')
         ylim = ax.get_ylim()
         ymax = 1.5e10
-        ax.set_ylim([ylim[0], ymax])
+        ax.set_ylim([1e8, ymax])
         print(f'WRN! {len(mdf[mdf.gyroage_yr > ymax])} older than max plotted gyroage')
         outpath = join(outdir, f'cks-VII_rp_vs_gyroage_{scale}.png')
         savefig(f, outpath, writepdf=0)
@@ -457,15 +457,40 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
     sel = ~pd.isnull(mdf[Prot_key])
     N_withProt = len(mdf[sel])
     N_noProt = len(fp18_df) - N_withProt
-    ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=2, c='k', zorder=3,
+    ax.scatter(mdf[sel].VIIp_Per, mdf[sel].VIIp_Rp, s=1.5, c='k', zorder=3,
                label=f'Yes {Prot_source} '+'P$_\mathrm{rot}$ '+f'({N_withProt})')
-    ax.scatter(fp18_df.VIIp_Per, fp18_df.VIIp_Rp, s=1, c='darkgray', zorder=2,
+    ax.scatter(fp18_df.VIIp_Per, fp18_df.VIIp_Rp, s=1.5, c='darkgray', zorder=2,
                label=f'No {Prot_source} '+'P$_\mathrm{rot}$ '+f'({N_noProt})')
     ax.legend(fontsize='small')
     ax.set_xlabel('CKS-VII P$_\mathrm{orb}$ [day]')
     ax.set_ylabel('CKS-VII R$_\mathrm{p}$ [R$_\oplus$]')
     ax.set_xscale('log'); ax.set_yscale('log')
     outpath = join(outdir, f'cks-VII_period_vs_cks-VII_prad_{Prot_source}_match.png')
+    savefig(f, outpath, writepdf=0)
+
+    plt.close('all')
+    f, ax = plt.subplots(figsize=(4,3))
+    sel = ~pd.isnull(mdf[Prot_key])
+    N_withProt = len(mdf[sel])
+    N_noProt = len(fp18_df) - N_withProt
+
+    hasrot = (fp18_df['VIIp_SimbadName'].isin(mdf[sel]['VIIp_SimbadName']))
+    norot = ~hasrot
+
+    ax.scatter(fp18_df[hasrot].VIIp_Per, fp18_df[hasrot].VIIp_Rp, s=1.5, c='darkgray',
+               zorder=2,
+               label=f'Yes {Prot_source} '+'P$_\mathrm{rot}$ '+f'({N_withProt})')
+    ax.scatter(fp18_df[norot].VIIp_Per, fp18_df[norot].VIIp_Rp, s=1.5, c='k',
+               zorder=3,
+               label=f'No {Prot_source} '+'P$_\mathrm{rot}$ '+f'({N_noProt})')
+    ax.legend(fontsize='small')
+    ax.set_xlabel('CKS-VII P$_\mathrm{orb}$ [day]')
+    ax.set_ylabel('CKS-VII R$_\mathrm{p}$ [R$_\oplus$]')
+    ax.set_xscale('log'); ax.set_yscale('log')
+    outpath = join(
+        outdir,
+        f'cks-VII_period_vs_cks-VII_prad_{Prot_source}_match_inverted.png'
+    )
     savefig(f, outpath, writepdf=0)
 
     plt.close('all')

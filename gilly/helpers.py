@@ -25,7 +25,9 @@ import astropy.units as u, astropy.constants as c
 from astropy.io.votable import parse
 
 from gilly.paths import DATADIR, RESULTSDIR
-from gilly.gyrochronology import MamajekHillenbrand08_gyro, Angus19_gyro
+from gilly.gyrochronology import (
+    MamajekHillenbrand08_gyro, Angus19_gyro, SpadaLanzafame20_gyro
+)
 from cdips.utils.mamajek import get_interp_BmV_from_Teff
 
 def _get_spec_vsini_phot_Prot_overlap(Prot_source='M15'):
@@ -77,7 +79,8 @@ def get_merged_rot_CKS(Prot_source='M15'):
 def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     """
     Same as get_merged_rot_CKS, but also calculate the gyro ages using the
-    Mamajek & Hillenbrand (2008) relation (or the Angus+19 one).
+    Mamajek & Hillenbrand (2008) relation (or the Angus+19 one, or the Spada &
+    Lanzafame 2020 one).
     """
 
     mdf, _ = get_merged_rot_CKS(Prot_source=Prot_source)
@@ -89,6 +92,13 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
         mdf['BmV'] = BmV
         t_yr = MamajekHillenbrand08_gyro(arr(mdf.BmV), Prot)
         mdf['gyroage_yr'] = t_yr
+
+    elif gyro_source == 'SL20':
+        BmV = get_interp_BmV_from_Teff(arr(mdf.VIIs_Teff))
+        mdf['BmV'] = BmV
+        t_yr = SpadaLanzafame20_gyro(arr(mdf.BmV), Prot)
+        mdf['gyroage_yr'] = t_yr
+        mdf = mdf[mdf.gyroage_yr != 10e9]
 
     elif gyro_source == 'A19':
 
