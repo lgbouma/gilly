@@ -1,5 +1,12 @@
+"""
+MamajekHillenbrand08_gyro(BmV, Prot)
+SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True)
+Angus19_gyro(BpmRp, Prot)
+"""
+import os
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib as mpl
+from gilly.paths import DATADIR, RESULTSDIR
 
 def MamajekHillenbrand08_gyro(BmV, Prot):
     """
@@ -49,7 +56,8 @@ def SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True):
     Spada & Lanzafame 2020 give gyrochrones in B-V (and mass) vs age space.
     Will need to interpolate between them on a 2D grid.
     """
-    sl20path = '/Users/luke/Dropbox/proj/gilly/data/Spada_Lanzafame_2020_BmV_table.csv'
+
+    sl20path = os.path.join(DATADIR, 'Spada_Lanzafame_2020_BmV_table.csv')
     df = pd.read_csv(sl20path, sep='&')
 
     from scipy.interpolate import interp2d, interp1d
@@ -75,7 +83,8 @@ def SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True):
         set_style()
         fig, ax = plt.subplots(figsize=(4,3))
         X,Y = np.meshgrid(BmV_new, age_new)
-        cmap = plt.cm.viridis
+        #cmap = plt.cm.viridis
+        cmap = plt.cm.Paired
         norm = mpl.colors.Normalize(vmin=np.nanmin(Prot_new),
                                     vmax=np.nanmax(Prot_new))
         im = ax.pcolormesh(X, Y, Prot_new.T, cmap=cmap, norm=norm,
@@ -85,7 +94,8 @@ def SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True):
         cbar = fig.colorbar(im, orientation='vertical', extend='min',
                             label='Prot [day]')
         cbar.ax.tick_params(labelsize=6, direction='out')
-        outpath = '../results/SpadaLanzafame2020/interpolation_check.png'
+        outpath = os.path.join(RESULTSDIR,'SpadaLanzafame2020',
+                               'interpolation_check.png')
         savefig(fig, outpath, writepdf=False)
 
     age_gyrs = []
