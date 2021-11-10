@@ -3,13 +3,16 @@ contents:
 
     plot_spec_vs_phot_Prot
     plot_spec_Prot_hist
+    plot_spec_vs_phot_Prot
 
     plot_cdf_rp_agecut_KS_test
     plot_hist_rp_agecut
     plot_stsnr_vs_gyroage
+
     plot_cks_rp_vs_gyroage
     plot_cks_rp_vs_prot
-    plot_spec_vs_phot_Prot
+
+    plot_S21_prot_vs_teff
 """
 import os
 from os.path import join
@@ -18,7 +21,8 @@ from astropy import units as u, constants as c
 
 from gilly.helpers import (
     get_merged_rot_CKS, get_merged_gyroage_CKS, _add_Christiansen12_CDPP,
-    _get_spec_vsini_phot_Prot_overlap, _get_Curtis20_data
+    _get_spec_vsini_phot_Prot_overlap, _get_Curtis20_data, _get_Santos21_data,
+    PleiadesInterpModel, PraesepeInterpModel
 )
 from gilly.paths import DATADIR, RESULTSDIR
 
@@ -533,3 +537,104 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
 
     outpath = join(outdir, f'cks-VII_period_vs_cks-VII_prad_{Prot_source}-Protcolors.png')
     savefig(f, outpath, writepdf=0)
+
+
+def plot_S21_prot_vs_teff(koiflag, ylim=None):
+    # koiflag: 0 is confirmed.  1 is candidate.
+
+    set_style()
+
+    outdir = join(RESULTSDIR, f'S21_prot_vs_teff')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    Prot_source = 'S21'
+    df = _get_Santos21_data()
+
+    sel = np.zeros(len(df)).astype(bool)
+    for f in koiflag:
+        sel |= (df.flag4 == f)
+    df = df[sel]
+
+    reference_clusters = ['Pleiades', 'Praesepe']
+    for scale in ['linear','log']:
+        plt.close('all')
+        f, ax = plt.subplots(figsize=(4,3))
+        ax.scatter(df.Teff, df.Prot, s=2, c='k',
+                   label=f'{Prot_source}', zorder=10)
+        for ix, c in enumerate(reference_clusters):
+            cdf = _get_Curtis20_data(c.lower())
+
+            # data
+            ax.scatter(cdf.Teff, cdf.Prot, s=1, c=f'C{ix}', label=c)
+
+            # interpolated model
+            InterpModel = (
+                PleiadesInterpModel if c == 'Pleiades' else PraesepeInterpModel
+            )
+            _teff = np.linspace(4500, 6400, 300)
+            _prot = InterpModel(_teff)
+            ax.plot(_teff, _prot, lw=1, c=f'C{ix}')
+
+        ax.legend(fontsize='x-small', loc='best')
+        ax.set_xlabel('T$_\mathrm{eff}$ [K]')
+        ax.set_ylabel(f'{Prot_source} '+'P$_\mathrm{rot}$ [day]')
+        ax.set_xlim(ax.get_xlim()[::-1])
+        ax.set_xlim([7000,4000])
+        if isinstance(ylim, list):
+            ax.set_ylim(ylim)
+        ax.set_xscale('linear'); ax.set_yscale(scale)
+
+        if koiflag == [0]:
+            titlestr = 'Confirmed KOIs only'
+        elif koiflag == [0,1]:
+            titlestr = 'Confirmed + candidate KOIs'
+        ax.set_title(titlestr)
+
+        kstr = '_'.join(np.array(koiflag).astype(str))
+        s = ''
+        if isinstance(ylim, list):
+            s += 'ylim'+'_'.join(np.array(ylim).astype(str))
+
+        outpath = join(
+            outdir, f'teff_vs_{Prot_source}_prot_{scale}_koiflag{kstr}{s}.png'
+        )
+        savefig(f, outpath, writepdf=0)
+
+        #
+        # print any KOIs below the cutoffs
+        #
+        sel = (df.Teff > 4500) & (df.Teff < 6400)
+        sdf = df[sel]
+        pleiades_model_prot = PleiadesInterpModel(sdf.Teff)
+        praesepe_model_prot = PraesepeInterpModel(sdf.Teff)
+
+        below_Pleiades = (sdf.Prot < pleiades_model_prot)
+        below_Praesepe = (sdf.Prot < praesepe_model_prot)
+
+        PRINT = 0
+        if scale == 'linear' and isinstance(ylim, list):
+            PRINT = 1
+
+        if PRINT:
+            print(42*'-')
+            print(f'Below Pleaides, KOI flags {kstr}. N={len(sdf[below_Pleiades])}')
+            print(sdf[below_Pleiades].sort_values(by='Prot'))
+            print(11*'#')
+            print(f'Below Praesepe, KOI flags {kstr}. N={len(sdf[below_Praesepe])}')
+            print(sdf[below_Praesepe].sort_values(by='Prot'))
+            print(42*'-')
+
+        sdf['is_below_Praesepe'] = below_Praesepe.astype(int)
+        sdf['is_below_Pleiades'] = below_Pleiades.astype(int)
+
+        outcsvpath = join(
+            DATADIR,
+            f'Santos21_koiflag{kstr}_below_Praesepe_in_Prot_Teff_Teff_btwn_4500_6400.csv'
+        )
+        if not os.path.exists(outcsvpath):
+            outdf = sdf[below_Praesepe].sort_values(by='Prot')
+            outdf.to_csv(outcsvpath, index=False)
+            print(f"Made {outcsvpath}")
+        else:
+            print(f"Found {outcsvpath} and did not overwrite.")

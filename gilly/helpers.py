@@ -9,9 +9,13 @@ Contents:
     _add_Christiansen12_CDPP
     _get_McQuillan13_data
     _get_Mazeh15_data
+    _get_Santos21_data
     _get_cks_data
     _apply_cks_VII_filters
-    _get_Curtis20_ProtTeff
+    _get_Curtis20_data
+
+    PleiadesInterpModel
+    PraesepeInterpModel
 """
 import matplotlib.pyplot as plt, pandas as pd, numpy as np
 import os
@@ -24,6 +28,7 @@ from astropy.io import ascii, fits
 from astropy.coordinates import SkyCoord
 import astropy.units as u, astropy.constants as c
 from astropy.io.votable import parse
+from scipy.interpolate import interp1d
 
 from gilly.paths import DATADIR, RESULTSDIR
 from gilly.gyrochronology import (
@@ -248,7 +253,7 @@ def _get_Mazeh15_data():
 def _get_Santos21_data():
 
     t = Table.read(
-        os.path.join(DATADIR, 'Santos_2021_apjsac033ft1_mrt.txt'),
+        join(DATADIR, 'Santos_2021_apjsac033ft1_mrt.txt'),
         format='cds'
     )
 
@@ -369,7 +374,7 @@ def _get_Curtis20_data(cluster):
     """
 
     t = Table.read(
-        os.path.join(DATADIR, 'Curtis_2020_apjabbf58t5_mrt.txt'),
+        join(DATADIR, 'Curtis_2020_apjabbf58t5_mrt.txt'),
         format='cds'
     )
     if cluster == 'pleiades':
@@ -380,3 +385,37 @@ def _get_Curtis20_data(cluster):
         raise NotImplementedError
 
     return df
+
+
+def PleiadesInterpModel(Teff):
+
+    df = pd.read_csv(
+        join(DATADIR, 'Curtis_2020_webplotdigitize_Pleiades_upper.csv')
+    )
+    df = df.sort_values(by='Teff')
+
+    fn_teff_to_prot = interp1d(
+        df.Teff, df.Prot, kind='quadratic',
+        bounds_error=True, fill_value=np.nan
+    )
+
+    Protmod = fn_teff_to_prot(Teff)
+
+    return Protmod
+
+
+def PraesepeInterpModel(Teff):
+
+    df = pd.read_csv(
+        join(DATADIR, 'Curtis_2020_webplotdigitize_Praesepe_mid.csv')
+    )
+    df = df.sort_values(by='Teff')
+
+    fn_teff_to_prot = interp1d(
+        df.Teff, df.Prot, kind='quadratic',
+        bounds_error=True, fill_value=np.nan
+    )
+
+    Protmod = fn_teff_to_prot(Teff)
+
+    return Protmod
