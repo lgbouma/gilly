@@ -11,6 +11,7 @@ Contents:
     _get_Mazeh15_data
     _get_cks_data
     _apply_cks_VII_filters
+    _get_Curtis20_ProtTeff
 """
 import matplotlib.pyplot as plt, pandas as pd, numpy as np
 import os
@@ -64,6 +65,9 @@ def get_merged_rot_CKS(Prot_source='M15'):
     elif Prot_source == 'VSINI':
         rot_df = _get_CKS_vsini_data(snrcut=True)
         kic_key = 'id_kic'
+    elif Prot_source == 'S21':
+        rot_df = _get_Santos21_data()
+        kic_key = 'KIC'
     else:
         raise NotImplementedError
 
@@ -84,7 +88,7 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
     """
 
     mdf, _ = get_merged_rot_CKS(Prot_source=Prot_source)
-    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
+    Prot_key = 'Prot' if Prot_source in ['M13','M15','S21'] else 'spec_Prot'
     Prot = arr(mdf[Prot_key])
 
     if gyro_source == 'MH08':
@@ -121,7 +125,7 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
 
             g_df = g_df[selcols]
 
-            kic_key = 'KIC' if Prot_source in ['M13','M15'] else 'id_kic'
+            kic_key = 'KIC' if Prot_source in ['M13','M15','S21'] else 'id_kic'
             mdf[kic_key] = mdf[kic_key].astype(str)
 
             # NOTE: Bedell's crossmatch was KIC against Gaia DR2. So, some KIC
@@ -138,7 +142,7 @@ def get_merged_gyroage_CKS(Prot_source='M15', gyro_source='MH08'):
 
             mdf_gaiasupp.to_csv(gaiasupppath, index=False)
 
-        if Prot_source in ['M13', 'M15', 'VSINI']:
+        if Prot_source in ['M13', 'M15', 'S21', 'VSINI']:
             N_missed = 0
         else:
             raise NotImplementedError
@@ -241,6 +245,16 @@ def _get_Mazeh15_data():
     return m15_df[sel]
 
 
+def _get_Santos21_data():
+
+    t = Table.read(
+        os.path.join(DATADIR, 'Santos_2021_apjsac033ft1_mrt.txt'),
+        format='cds'
+    )
+
+    df = t.to_pandas()
+
+    return df
 
 
 def _get_cks_data():
@@ -347,3 +361,22 @@ def _apply_cks_VII_filters(df):
     sel &= arr(df['II_koi_impact']) < 0.9
 
     return sel
+
+
+def _get_Curtis20_data(cluster):
+    """
+    cluster == "pleiades" or "praesepe"
+    """
+
+    t = Table.read(
+        os.path.join(DATADIR, 'Curtis_2020_apjabbf58t5_mrt.txt'),
+        format='cds'
+    )
+    if cluster == 'pleiades':
+        df = t[t['Cluster'] == 'Pleiades'].to_pandas()
+    elif cluster == 'praesepe':
+        df = t[t['Cluster'] == 'Praesepe'].to_pandas()
+    else:
+        raise NotImplementedError
+
+    return df

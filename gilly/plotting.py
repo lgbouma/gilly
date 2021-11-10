@@ -18,7 +18,7 @@ from astropy import units as u, constants as c
 
 from gilly.helpers import (
     get_merged_rot_CKS, get_merged_gyroage_CKS, _add_Christiansen12_CDPP,
-    _get_spec_vsini_phot_Prot_overlap
+    _get_spec_vsini_phot_Prot_overlap, _get_Curtis20_data
 )
 from gilly.paths import DATADIR, RESULTSDIR
 
@@ -396,7 +396,7 @@ def plot_cks_rp_vs_gyroage(Prot_source='M15', gyro_source='A19'):
 
     plt.close('all')
     f, ax = plt.subplots(figsize=(4.3,3))
-    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
+    Prot_key = 'Prot' if Prot_source in ['M13','M15','S21'] else 'spec_Prot'
     sel = ~pd.isnull(mdf[Prot_key])
 
     norm = mpl.colors.Normalize(vmin=8.5, vmax=10)
@@ -426,7 +426,7 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
     """
 
     mdf, fp18_df = get_merged_rot_CKS(Prot_source=Prot_source)
-    Prot_key = 'Prot' if Prot_source in ['M13','M15'] else 'spec_Prot'
+    Prot_key = 'Prot' if Prot_source in ['M13','M15','S21'] else 'spec_Prot'
 
     set_style()
 
@@ -441,6 +441,23 @@ def plot_cks_rp_vs_prot(Prot_source='M15'):
         ax.set_ylabel(f'{Prot_source} '+'P$_\mathrm{rot}$ [day]')
         ax.set_xscale(scale); ax.set_yscale(scale)
         outpath = join(outdir, f'cks-VII_rp_vs_{Prot_source}_prot_{scale}.png')
+        savefig(f, outpath, writepdf=0)
+
+    for scale in ['linear','log']:
+        plt.close('all')
+        f, ax = plt.subplots(figsize=(4,3))
+        ax.scatter(mdf.VIIs_Teff, mdf[Prot_key], s=2, c='k',
+                   label=f'CKS-VII $\otimes$ {Prot_source}', zorder=10)
+        for ix, c in enumerate(['Pleiades', 'Praesepe']):
+            cdf = _get_Curtis20_data(c.lower())
+            ax.scatter(cdf.Teff, cdf.Prot, s=1, c=f'C{ix}', label=c)
+        ax.legend(fontsize='x-small', loc='best')
+        ax.set_xlabel('CKS-VII T$_\mathrm{eff}$ [K]')
+        ax.set_ylabel(f'{Prot_source} '+'P$_\mathrm{rot}$ [day]')
+        ax.set_xlim(ax.get_xlim()[::-1])
+        ax.set_xlim([7000,4000])
+        ax.set_xscale('linear'); ax.set_yscale(scale)
+        outpath = join(outdir, f'cks-VII_teff_vs_{Prot_source}_prot_{scale}.png')
         savefig(f, outpath, writepdf=0)
 
     plt.close('all')
