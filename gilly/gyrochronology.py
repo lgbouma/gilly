@@ -1,12 +1,37 @@
 """
-MamajekHillenbrand08_gyro(BmV, Prot)
-SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True)
-Angus19_gyro(BpmRp, Prot)
+Given color and Prot, what is age?
+    MamajekHillenbrand08_gyro(BmV, Prot)
+    SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True)
+    Angus19_gyro(BpmRp, Prot)
+
+Given color and age, what is Prot?
+    MamajekHillenbrand08_gyro_Prot
+    Angus19_gyro_Prot
+    SpadaLanzafame20_gyro_Prot
 """
 import os
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib as mpl
 from gilly.paths import DATADIR, RESULTSDIR
+
+def MamajekHillenbrand08_gyro_Prot(BmV, t_Myr):
+
+    if BmV > 0.95 or BmV < 0.5:
+        BmV = np.nan
+
+    a = 0.407
+    a_err = 0.021
+    b = 0.325
+    b_err = 0.024
+    c = 0.495
+    c_err = 0.010
+    n = 0.566
+    n_err = 0.008
+
+    Prot = a * (BmV - c)**b * (t_Myr)**n
+
+    return Prot
+
 
 def MamajekHillenbrand08_gyro(BmV, Prot):
     """
@@ -49,6 +74,31 @@ def find_nearest(array, value, verbose=False, return_index=False):
 
     if return_index:
         return array[idx], idx
+
+
+def SpadaLanzafame20_gyro_Prot(BmV, age_myr):
+
+    from scipy.interpolate import interp2d
+
+    sl20path = os.path.join(DATADIR, 'Spada_Lanzafame_2020_BmV_table.csv')
+    df = pd.read_csv(sl20path, sep='&')
+
+    df = df.sort_values(by='BmV')
+    BmV_arr = np.array(df.BmV).astype(float)
+    age_gyr = np.array(df.columns[1:-1]).astype(float)
+    Prot_array = np.array(
+        df[[c for c in df.columns if (c!='BmV' and c!='4.57')]]
+    ).astype(float)
+
+    fn = interp2d(age_gyr, BmV_arr, Prot_array, kind='cubic', bounds_error=False,
+                  fill_value=0)
+
+    Prot_new = fn(age_myr/(1e3), BmV)
+
+    if np.sum(Prot_new) == 0:
+        Prot_new == np.nan
+
+    return float(Prot_new)
 
 
 def SpadaLanzafame20_gyro(BmV=None, Prot=None, makeplot=True):
@@ -150,3 +200,20 @@ def Angus19_gyro(BpmRp, Prot):
     t_yr = 10**np.array(log10_age_yrs)
 
     return t_yr
+
+def Angus19_gyro_Prot(BpmRp, t_Myr):
+    """
+    Run a ~*SIMPLE*~ gyrochronology model from Angus+2019.
+    Requires `stardate`: https://github.com/RuthAngus/stardate
+
+    If you want more ~*PRECISE*~ ages, it is better to use spectroscopic
+    parameters for the joint isochrone + gyrochrone fit, and to run MCMC. See
+    the README from the repo above.
+    """
+
+    from stardate.lhf import gyro_model_praesepe
+
+    log10_age_yrs = np.log10(t_Myr*1e6)
+    log10_period = gyro_model_praesepe(log10_age_yrs, BpmRp)
+
+    return 10**log10_period

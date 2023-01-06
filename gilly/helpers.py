@@ -304,7 +304,7 @@ def _get_cks_data():
     df_m = pd.merge(df_VII_planets, df_VII_stars, how='left',
                     left_on='VIIp_id_starname', right_on='VIIs_KOI')
 
-    df_II = pd.read_csv('../data/cks_physical_merged.csv')
+    df_II = pd.read_csv(os.path.join(DATADIR, 'cks_physical_merged.csv'))
     renamedict = {c:'II_'+c for c in list(df_II.columns)}
     df_II.rename(columns=renamedict, inplace=True)
 
